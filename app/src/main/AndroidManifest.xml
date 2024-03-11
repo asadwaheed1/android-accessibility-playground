@@ -2,13 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission
-        android:name="android.permission.CAPTURE_VIDEO_OUTPUT"
-        tools:ignore="ProtectedPermissions" />
 
     <application
         android:name=".App"
@@ -34,11 +27,7 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".services.ScreenCaptureService"
-            android:exported="true"
-            android:label="@string/add_note"
-            android:foregroundServiceType="mediaProjection" />
+
         <service
             android:name=".services.MyAccessibilityService"
             android:exported="false"

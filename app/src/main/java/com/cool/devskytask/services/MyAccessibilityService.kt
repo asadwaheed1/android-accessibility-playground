@@ -148,7 +148,7 @@ class MyAccessibilityService : AccessibilityService() {
             height = WindowManager.LayoutParams.WRAP_CONTENT
             // Set position based on the provided rect
             x = rect.left
-            y = rect.bottom
+            y = rect.top
             gravity = Gravity.TOP or Gravity.START
             format = PixelFormat.TRANSPARENT
         }
@@ -169,18 +169,6 @@ class MyAccessibilityService : AccessibilityService() {
             windowManager.removeView(view)
         })
 
-
-        // Remove the view after animation completes
-        /*scaleAnimation.setAnimationListener(object : Animation.AnimationListener {
-            override fun onAnimationStart(animation: Animation?) {}
-            override fun onAnimationRepeat(animation: Animation?) {}
-            override fun onAnimationEnd(animation: Animation?) {
-                windowManager.removeView(view)
-            }
-        })*/
-        /* Handler(Looper.getMainLooper()).postDelayed({
-             windowManager.removeView(view)
-         }, 2000)*/
     }
 
 
@@ -194,14 +182,12 @@ class MyAccessibilityService : AccessibilityService() {
             width = 200
             height = 200
             // Set position based on the provided rect
-            x = (rect.left + rect.right) / 2
-            y = (rect.top + rect.bottom) / 2
+            x = rect.left
+            y = rect.top
             gravity = Gravity.TOP or Gravity.START
             format = PixelFormat.TRANSPARENT
         }
         val view = LayoutInflater.from(context).inflate(R.layout.float_view, null)
-        //val textParams = LinearLayout.LayoutParams(rect.width(), rect.height())
-        //  view.layoutParams = textParams
         windowManager.addView(view, layoutParams)
         Handler(Looper.getMainLooper()).postDelayed({
             try {
@@ -227,50 +213,17 @@ class MyAccessibilityService : AccessibilityService() {
 
     var mLayout: FrameLayout? = null
 
-    /*override fun onServiceConnected() {
-        super.onServiceConnected()
-        val info = AccessibilityServiceInfo()
-        info.eventTypes =
-            AccessibilityEvent.TYPE_VIEW_CLICKED or AccessibilityEvent.TYPE_VIEW_FOCUSED or AccessibilityEvent.TYPE_TOUCH_INTERACTION_END or AccessibilityEvent.TYPE_TOUCH_INTERACTION_START
-        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_ALL_MASK
-        info.notificationTimeout = 100
-        this.serviceInfo = info
-        *//*  val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-          mLayout = FrameLayout(this)
-          val layoutParams = WindowManager.LayoutParams()
-          layoutParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-          layoutParams.format = PixelFormat.TRANSLUCENT
-          layoutParams.flags = layoutParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-          layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT
-          layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT
-          layoutParams.gravity = Gravity.LEFT
-          val inflater = LayoutInflater.from(this)
-          inflater.inflate(R.layout.floating_bar, mLayout)
-          windowManager.addView(mLayout, layoutParams)
-          configurePowerButton()
-          configureSimulateTouch()
-          configureVolumeButton()
-          configureScrollButton()
-          configureSwipeButton()*//*
-    }
-*/
     fun findTextViewNode(nodeInfo: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
 
-        //I highly recommend leaving this line in! You never know when the screen content will
-        //invalidate a node you're about to work on, or when a parents child will suddenly be gone!
-        //Not doing this safety check is very dangerous!
+
         if (nodeInfo == null) return null
         Log.v(TAG, nodeInfo.toString())
 
-        //Notice that we're searching for the TextView's simple name!
-        //This allows us to find AppCompat versions of TextView as well
-        //as 3rd party devs well names subclasses... though with perhaps
-        //a few poorly named unintended stragglers!
+
         if (nodeInfo.className.toString().contains(TextView::class.java.simpleName)) {
             return nodeInfo
         }
 
-        //Do other work!
         for (i in 0 until nodeInfo.childCount) {
             val result = findTextViewNode(nodeInfo.getChild(i))
             if (result != null) return result
@@ -297,76 +250,13 @@ class MyAccessibilityService : AccessibilityService() {
             }
 
             // Recycle the childNode to avoid memory leaks
-            childNode.recycle()
+            // childNode.recycle()
         }
 
         // Return the last non-null child node found
         return lastNonNullChild ?: nodeInfo
     }
 
-
-    private fun configurePowerButton() {
-        val power = mLayout?.findViewById(R.id.power) as Button
-        power.setOnClickListener { performGlobalAction(GLOBAL_ACTION_POWER_DIALOG) }
-    }
-
-    private fun configureVolumeButton() {
-        val volumeUpButton = mLayout?.findViewById(R.id.volume_up) as Button
-        volumeUpButton.setOnClickListener {
-            val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-            audioManager.adjustStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI
-            )
-        }
-    }
-
-    private fun configureSimulateTouch() {
-        val btnSimulateTouch = mLayout?.findViewById(R.id.simulateTouch) as Button
-        btnSimulateTouch.setOnClickListener {
-            Log.e(TAG, "onClick: Simulate Touch")
-            val tap = Path()
-            tap.moveTo(110F, 50F)
-            val tapBuilder = GestureDescription.Builder()
-            tapBuilder.addStroke(StrokeDescription(tap, 0, 500))
-            dispatchGesture(tapBuilder.build(), null, null)
-        }
-    }
-
-    private fun findScrollableNode(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        val deque: ArrayDeque<AccessibilityNodeInfo> = ArrayDeque()
-        deque.add(root)
-        while (!deque.isEmpty()) {
-            val node = deque.removeFirst()
-            if (node.actionList.contains(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD)) {
-                return node
-            }
-            for (i in 0 until node.childCount) {
-                deque.addLast(node.getChild(i))
-            }
-        }
-        return null
-    }
-
-    private fun configureScrollButton() {
-        val scrollButton = mLayout?.findViewById(R.id.scroll) as Button
-        scrollButton.setOnClickListener {
-            val scrollable = findScrollableNode(rootInActiveWindow)
-            scrollable?.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD.id)
-        }
-    }
-
-    private fun configureSwipeButton() {
-        val swipeButton = mLayout?.findViewById(R.id.swipe) as Button
-        swipeButton.setOnClickListener {
-            val swipePath = Path()
-            swipePath.moveTo(1000F, 1000F)
-            swipePath.lineTo(100F, 1000F)
-            val gestureBuilder = GestureDescription.Builder()
-            gestureBuilder.addStroke(StrokeDescription(swipePath, 0, 500))
-            dispatchGesture(gestureBuilder.build(), null, null)
-        }
-    }
 
 }
 
