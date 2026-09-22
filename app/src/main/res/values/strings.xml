@@ -1,20 +1,10 @@
 <resources>
     <string name="app_name">devSkyTask</string>
-    <string name="add_note">Add Note</string>
-    <string name="notification_channel_general">QuickNote</string>
-    <string name="notification_text">Tap to add quick note.</string>
-    <string name="notification_exit">Exit</string>
-    <string name="permission_required_title">Permission Required</string>
-    <string name="permission_required_text">Please enabled \'Draw over other apps\' permission for QuickNote to work correctly.</string>
-    <string name="permission_required_open">Open Settings</string>
-    <string name="permission_error_title">Permission Error</string>
-    <string name="permission_error_text">Cannot open the settings screen for obtaining the required permission.</string>
-    <string name="common_ok">OK</string>
-    <string name="accessibility_service_description">for detecting textview</string>
-    <string name="accessibility_service_label">Accessibility Service Example</string>
-    <string name="power">Power</string>
-    <string name="volume">Volume Up</string>
-    <string name="scroll">Scroll Down</string>
-    <string name="swipe">Swipe Right</string>
-    <string name="simulateTouch">Simulate Touch</string>
+    <string name="main_title">DevSky Task</string>
+    <string name="main_description">This app highlights the text and views you tap in other apps. Enable its accessibility service by pressing the button below and turning on the related setting.</string>
+    <string name="main_open_settings">Open accessibility settings</string>
+    <string name="main_service_enabled">The accessibility service is enabled.</string>
+    <string name="main_service_disabled">The accessibility service is disabled.</string>
+    <string name="accessibility_service_description">Highlights the text and views you interact with on screen.</string>
+    <string name="accessibility_service_label">DevSky text highlighter</string>
 </resources>

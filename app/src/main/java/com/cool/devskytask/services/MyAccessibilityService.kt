@@ -1,18 +1,9 @@
 package com.cool.devskytask.services
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
-import android.accessibilityservice.GestureDescription
-import android.accessibilityservice.GestureDescription.StrokeDescription
-import android.content.Context
-import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.RippleDrawable
-import android.media.AudioManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -22,248 +13,150 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.TextView
 import com.cool.devskytask.R
 
 
+/**
+ * Highlights the view the user interacts with: text views get an enlarged copy of their text,
+ * anything else gets a ripple. Only one overlay is shown at a time.
+ */
 class MyAccessibilityService : AccessibilityService() {
-    val TAG = "RecorderService"
+    private val TAG = "MyAccessibilityService"
+    private val OVERLAY_DURATION_MS = 2000L
+    private val TEXT_SCALE = 2f
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
+    private var currentOverlay: View? = null
+    private val removeOverlayRunnable = Runnable { removeCurrentOverlay() }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val source = event.source ?: return
-        Log.e(TAG, "onAccessibilityEvent: ${source.className}")
-        Log.e(TAG, "onAccessibilityEventType: ${event.eventType}")
-        /*  when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_CLICKED -> {*/
-        val textNodeInfo = findTextViewNode(source)
-        if (textNodeInfo != null) {
-            val rect = Rect()
-            textNodeInfo.getBoundsInScreen(rect)
-            addAnimatedTextViewToWindow(this, rect, textNodeInfo.text?.toString().orEmpty())
-            Log.i(TAG, "The TextView Node: ${textNodeInfo.text}")
+        Log.d(TAG, "onAccessibilityEvent: type=${event.eventType} class=${source.className}")
+
+        val textNode = findTextViewNode(source)
+        val target = textNode ?: findDeepestLastNode(source)
+        val rect = Rect()
+        target.getBoundsInScreen(rect)
+        val text = textNode?.text?.toString()
+
+        if (target !== source) target.recycleCompat()
+        source.recycleCompat()
+
+        if (rect.isEmpty) return
+        if (text != null) {
+            showTextOverlay(rect, text)
         } else {
-            val rect = Rect()
-            val item = findLastNonNullChildNode(source)
-            item?.let {
-                item.getBoundsInScreen(rect)
-                addRippleLayoutToWindow(this, rect)
-            }
-
+            showRippleOverlay(rect)
         }
-
-        /*   }
-
-           AccessibilityEvent.TYPE_TOUCH_INTERACTION_END -> {
-               val rect = Rect()
-               val item = findLastNonNullChildNode(source)
-               item?.let {
-                   item.getBoundsInScreen(rect)
-                   addRippleLayoutToWindow(this, rect)
-               }
-           }
-
-           AccessibilityEvent.TYPE_TOUCH_EXPLORATION_GESTURE_START -> {
-               val rect = Rect()
-               val item = findLastNonNullChildNode(source)
-               item?.let {
-                   item.getBoundsInScreen(rect)
-                   addRippleLayoutToWindow(this, rect)
-               }
-           }
-
-           AccessibilityEvent.TYPE_VIEW_CONTEXT_CLICKED -> {
-               val rect = Rect()
-               val item = findLastNonNullChildNode(source)
-               item?.let {
-                   item.getBoundsInScreen(rect)
-                   addRippleLayoutToWindow(this, rect)
-               }
-           }
-*/
-        /*else -> {
-            val rect = Rect()
-            source.getBoundsInScreen(rect)
-            addRippleLayoutToWindow(this, rect)
-        }*/
-
-        // }
-
-
-        /* val findAccessibilityNodeInfosByViewId =
-             source.findAccessibilityNodeInfosByViewId("YOUR PACKAGE NAME:id/RESOURCE ID FROM WHERE YOU WANT DATA")*/
-        //     Log.e(TAG, "onAccessibilityEvent: ${event.source.toString()}")
-        /*if (findAccessibilityNodeInfosByViewId.size > 0) {
-            // You can also traverse the list if required data is deep in view hierarchy. 
-            val requiredText = findAccessibilityNodeInfosByViewId[0].text.toString()
-            Log.i("Required Text", requiredText)
-        }*/
-        /* when (event?.eventType) {
-             AccessibilityEvent.TYPE_TOUCH_INTERACTION_START -> {
-                 Log.e("TAG", "onAccessibilityEvent: TYPE_TOUCH_INTERACTION_START")
-                 val touchedView = event.source
-                 if (isTextView(touchedView)) {
-                     Log.e(TAG, "onAccessibilityEvent: textViewDetected")
-                     val view = touchedView as TextView
-                     Log.e(TAG, "onAccessibilityEvent: text is ${view.text}")
-                     // The user is interacting with a TextView
-                     // Handle the interaction as needed
-                 }
-             }
-
-             AccessibilityEvent.TYPE_TOUCH_INTERACTION_END -> {
-                 Toast.makeText(this,"touch",Toast.LENGTH_SHORT).show()
-                 // Handle the end of touch interaction
-                 Log.e(TAG, "onAccessibilityEvent: TYPE_TOUCH_INTERACTION_END")
-             }
-         }*/
     }
 
-    // Function to add a ripple effect to a given rect
-    fun addRippleEffectOld(view: View, rect: Rect) {
-        // Create a ripple drawable with a transparent background
-        val rippleDrawable = RippleDrawable(
-            ColorStateList.valueOf(Color.RED),
-            ColorDrawable(0xFFFFFFFF.toInt()),
-            null
-        )
-
-        // Set the bounds of the ripple drawable to match the provided rect
-        rippleDrawable.setBounds(rect)
-
-        // Set the ripple drawable as the background of the view
-        view.background = rippleDrawable
-    }
-
-
-    fun addAnimatedTextViewToWindow(context: Context, rect: Rect, text: String) {
-        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val layoutParams = WindowManager.LayoutParams().apply {
-            // Set window type and flags for accessibility overlay
-            type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-            flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            // Set layout parameters
-            width = WindowManager.LayoutParams.WRAP_CONTENT
-            height = WindowManager.LayoutParams.WRAP_CONTENT
-            // Set position based on the provided rect
-            x = rect.left
-            y = rect.top
-            gravity = Gravity.TOP or Gravity.START
-            format = PixelFormat.TRANSPARENT
-        }
-        val view = LayoutInflater.from(context).inflate(R.layout.animated_text_layout, null)
-        val textParams = LinearLayout.LayoutParams(rect.width(), rect.height())
-        // Find the TextView in the layout
+    private fun showTextOverlay(rect: Rect, text: String) {
+        val view = LayoutInflater.from(this).inflate(R.layout.animated_text_layout, null)
         val animatedTextView = view.findViewById<TextView>(R.id.animatedTextView)
-        animatedTextView.layoutParams = textParams
-
+        animatedTextView.layoutParams =
+            FrameLayout.LayoutParams(rect.width(), rect.height(), Gravity.CENTER)
         animatedTextView.text = text
 
-        // Load the custom animation
-        //    val scaleAnimation = AnimationUtils.loadAnimation(context, R.anim.text_scale_animation)
-        // Apply the animation to the TextView
-        windowManager.addView(view, layoutParams)
-        //  animatedTextView.startAnimation(scaleAnimation)
-        animatedTextView.animate().scaleX(2f).scaleY(2f).setDuration(2000).withEndAction {
-            try {
-                windowManager.removeView(view)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        // Make the window big enough to hold the scaled text so it isn't clipped.
+        val width = (rect.width() * TEXT_SCALE).toInt()
+        val height = (rect.height() * TEXT_SCALE).toInt()
+        showOverlay(view, rect.centerX() - width / 2, rect.centerY() - height / 2, width, height)
 
+        animatedTextView.animate()
+            .scaleX(TEXT_SCALE)
+            .scaleY(TEXT_SCALE)
+            .setDuration(OVERLAY_DURATION_MS)
     }
 
+    private fun showRippleOverlay(rect: Rect) {
+        val size = resources.getDimensionPixelSize(R.dimen.ripple_overlay_size)
+        val view = LayoutInflater.from(this).inflate(R.layout.float_view, null)
+        showOverlay(view, rect.centerX() - size / 2, rect.centerY() - size / 2, size, size)
+    }
 
-    fun addRippleLayoutToWindow(context: Context, rect: Rect) {
-        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    /** Replaces any overlay currently on screen with [view] and removes it after a delay. */
+    private fun showOverlay(view: View, x: Int, y: Int, width: Int, height: Int) {
+        removeCurrentOverlay()
         val layoutParams = WindowManager.LayoutParams().apply {
-            // Set window type and flags for accessibility overlay
             type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+            // Overlays are visual only: never take focus or touches from the app underneath,
+            // and use raw screen coordinates so they line up with getBoundsInScreen().
             flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            // Set layout parameters
-            width = 200
-            height = 200
-            // Set position based on the provided rect
-            x = rect.left
-            y = rect.top
-            gravity = Gravity.TOP or Gravity.START
-            format = PixelFormat.TRANSPARENT
-        }
-        val view = LayoutInflater.from(context).inflate(R.layout.float_view, null)
-        windowManager.addView(view, layoutParams)
-        Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                windowManager.removeView(view)
-            } catch (e: Exception) {
-                e.printStackTrace()
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
-        }, 2000)
+            this.width = width
+            this.height = height
+            this.x = x
+            this.y = y
+            gravity = Gravity.TOP or Gravity.START
+            format = PixelFormat.TRANSLUCENT
+        }
+        try {
+            windowManager.addView(view, layoutParams)
+            currentOverlay = view
+            handler.postDelayed(removeOverlayRunnable, OVERLAY_DURATION_MS)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not add overlay", e)
+        }
+    }
+
+    private fun removeCurrentOverlay() {
+        handler.removeCallbacks(removeOverlayRunnable)
+        val view = currentOverlay ?: return
+        currentOverlay = null
+        try {
+            windowManager.removeView(view)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not remove overlay", e)
+        }
     }
 
     override fun onInterrupt() {
-        Log.e(TAG, "Something went wrong");
-        // Handle interruption
+        removeCurrentOverlay()
     }
 
-
-    private fun isTextView(view: AccessibilityNodeInfo?): Boolean {
-        if (view == null) return false
-        // Check if the view is a TextView
-        val className = view.className?.toString()
-        return className == "android.widget.TextView"
+    override fun onDestroy() {
+        removeCurrentOverlay()
+        super.onDestroy()
     }
 
-    var mLayout: FrameLayout? = null
-
-    fun findTextViewNode(nodeInfo: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-
-
-        if (nodeInfo == null) return null
-        Log.v(TAG, nodeInfo.toString())
-
-
-        if (nodeInfo.className.toString().contains(TextView::class.java.simpleName)) {
+    /** Returns the first TextView in the tree rooted at [nodeInfo], or null if there is none. */
+    private fun findTextViewNode(nodeInfo: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (nodeInfo.className?.toString()?.contains(TextView::class.java.simpleName) == true) {
             return nodeInfo
         }
-
         for (i in 0 until nodeInfo.childCount) {
-            val result = findTextViewNode(nodeInfo.getChild(i))
+            val child = nodeInfo.getChild(i) ?: continue
+            val result = findTextViewNode(child)
+            if (result !== child) child.recycleCompat()
             if (result != null) return result
         }
         return null
     }
 
-    fun findLastNonNullChildNode(nodeInfo: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-        // Safety check to handle null nodeInfo
-        if (nodeInfo == null) return null
-
-        var lastNonNullChild: AccessibilityNodeInfo? = null
-
-        // Iterate through each child node
-        for (i in 0 until nodeInfo.childCount) {
-            val childNode = nodeInfo.getChild(i)
-
-            // Recursively find the last non-null child node
-            val lastChild = findLastNonNullChildNode(childNode)
-
-            // Update lastNonNullChild if the current child is not null
-            if (lastChild != null) {
-                lastNonNullChild = lastChild
-            }
-
-            // Recycle the childNode to avoid memory leaks
-            // childNode.recycle()
+    /** Returns the deepest node reached by always following the last child. */
+    private fun findDeepestLastNode(nodeInfo: AccessibilityNodeInfo): AccessibilityNodeInfo {
+        for (i in nodeInfo.childCount - 1 downTo 0) {
+            val child = nodeInfo.getChild(i) ?: continue
+            val result = findDeepestLastNode(child)
+            if (result !== child) child.recycleCompat()
+            return result
         }
-
-        // Return the last non-null child node found
-        return lastNonNullChild ?: nodeInfo
+        return nodeInfo
     }
 
-
+    /** Nodes must be recycled before Android 13; from 13 on recycle() is a deprecated no-op. */
+    @Suppress("DEPRECATION")
+    private fun AccessibilityNodeInfo.recycleCompat() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) recycle()
+    }
 }
-
