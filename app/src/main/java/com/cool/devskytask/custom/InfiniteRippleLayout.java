@@ -16,7 +16,6 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Property;
 import android.view.MotionEvent;
@@ -73,8 +72,6 @@ public class InfiniteRippleLayout extends FrameLayout {
     private AnimatorSet rippleAnimator;
 
     private Point currentCoords = new Point();
-
-    private int layerType;
 
     private int positionInAdapter;
 
@@ -135,10 +132,6 @@ public class InfiniteRippleLayout extends FrameLayout {
 
         paint.setColor(rippleColor);
         paint.setAlpha(rippleAlpha);
-
-        enableClipPathSupportIfNecessary();
-
-        startRipple();
     }
 
     @Override
@@ -169,6 +162,9 @@ public class InfiniteRippleLayout extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
+        if (childView == null) {
+            return false;
+        }
         return !findClickableViewInChild(childView, (int) event.getX(), (int) event.getY());
     }
 
@@ -186,10 +182,12 @@ public class InfiniteRippleLayout extends FrameLayout {
                         setRadius(0);
                         setRippleAlpha(rippleAlpha);
                     }
-                    if (rippleDelayClick) {
+                    if (rippleDelayClick && isAttachedToWindow()) {
                         startRipple();
                     }
-                    childView.setPressed(false);
+                    if (childView != null) {
+                        childView.setPressed(false);
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -217,8 +215,9 @@ public class InfiniteRippleLayout extends FrameLayout {
 
     private void cancelAnimations() {
         if (rippleAnimator != null) {
-            rippleAnimator.cancel();
+            // Remove listeners first so cancelling doesn't trigger onAnimationEnd and restart the loop
             rippleAnimator.removeAllListeners();
+            rippleAnimator.cancel();
         }
     }
 
@@ -261,7 +260,9 @@ public class InfiniteRippleLayout extends FrameLayout {
             positionInAdapter = newPosition;
             if (changed) {
                 cancelAnimations();
-                childView.setPressed(false);
+                if (childView != null) {
+                    childView.setPressed(false);
+                }
                 setRadius(0);
             }
             return changed;
@@ -295,11 +296,18 @@ public class InfiniteRippleLayout extends FrameLayout {
         super.onSizeChanged(w, h, oldw, oldh);
         bounds.set(0, 0, w, h);
         rippleBackground.setBounds(bounds);
+        currentCoords = new Point(w / 2, h / 2);
+        // Start once the size is known, otherwise the first ripple has a radius of 0
+        if (w > 0 && h > 0 && isAttachedToWindow()) {
+            startRipple();
+        }
     }
 
     @Override
-    public boolean isInEditMode() {
-        return true;
+    protected void onDetachedFromWindow() {
+        // Stop the endless ripple loop once the overlay is removed
+        cancelAnimations();
+        super.onDetachedFromWindow();
     }
 
     /*
@@ -308,7 +316,6 @@ public class InfiniteRippleLayout extends FrameLayout {
     @Override
     public void draw(Canvas canvas) {
         final boolean positionChanged = adapterPositionChanged();
-        currentCoords = new Point(getWidth() / 2, getHeight() / 2);
         if (rippleOverlay) {
             if (!positionChanged) {
                 rippleBackground.draw(canvas);
@@ -348,22 +355,5 @@ public class InfiniteRippleLayout extends FrameLayout {
     public void setRippleAlpha(Integer rippleAlpha) {
         paint.setAlpha(rippleAlpha);
         invalidate();
-    }
-
-    /**
-     * {@link Canvas#clipPath(Path)} is not supported in hardware accelerated layers
-     * before API 18. Use software layer instead
-     * <p/>
-     * https://developer.android.com/guide/topics/graphics/hardware-accel.html#unsupported
-     */
-    private void enableClipPathSupportIfNecessary() {
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            if (rippleRoundedCorners != 0) {
-                layerType = getLayerType();
-                setLayerType(LAYER_TYPE_SOFTWARE, null);
-            } else {
-                setLayerType(layerType, null);
-            }
-        }
     }
 }
