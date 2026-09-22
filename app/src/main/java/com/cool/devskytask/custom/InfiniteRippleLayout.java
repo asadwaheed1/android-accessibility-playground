@@ -169,6 +169,9 @@ public class InfiniteRippleLayout extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
+        if (childView == null) {
+            return false;
+        }
         return !findClickableViewInChild(childView, (int) event.getX(), (int) event.getY());
     }
 
@@ -189,7 +192,9 @@ public class InfiniteRippleLayout extends FrameLayout {
                     if (rippleDelayClick) {
                         startRipple();
                     }
-                    childView.setPressed(false);
+                    if (childView != null) {
+                        childView.setPressed(false);
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -261,7 +266,9 @@ public class InfiniteRippleLayout extends FrameLayout {
             positionInAdapter = newPosition;
             if (changed) {
                 cancelAnimations();
-                childView.setPressed(false);
+                if (childView != null) {
+                    childView.setPressed(false);
+                }
                 setRadius(0);
             }
             return changed;

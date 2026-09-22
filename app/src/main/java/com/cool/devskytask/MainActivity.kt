@@ -15,7 +15,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.cool.devskytask.databinding.ActivityMainBinding
 import com.cool.devskytask.services.MyAccessibilityService
-import com.cool.devskytask.services.ScreenCaptureService
 import com.google.android.material.snackbar.Snackbar
 
 
@@ -98,6 +97,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun requestNotif() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // POST_NOTIFICATIONS is a runtime permission only on Android 13+
+            sendNotification()
+            return
+        }
         when {
             ContextCompat.checkSelfPermission(
                 this,
@@ -118,7 +122,7 @@ class MainActivity : AppCompatActivity() {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         val uri: Uri =
-                            Uri.fromParts("com.onesilisondiode.geeksforgeeks", packageName, null)
+                            Uri.fromParts("package", packageName, null)
                         intent.data = uri
                         startActivity(intent)
                     }

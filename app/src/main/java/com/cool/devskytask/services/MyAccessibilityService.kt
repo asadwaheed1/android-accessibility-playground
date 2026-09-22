@@ -32,16 +32,17 @@ import com.cool.devskytask.R
 class MyAccessibilityService : AccessibilityService() {
     val TAG = "RecorderService"
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        val source = event!!.source ?: return
-        Log.e(TAG, "onAccessibilityEvent: ${event.source?.className}")
+        if (event == null) return
+        val source = event.source ?: return
+        Log.e(TAG, "onAccessibilityEvent: ${source.className}")
         Log.e(TAG, "onAccessibilityEventType: ${event.eventType}")
         /*  when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {*/
-        val textNodeInfo = findTextViewNode(event.source)
+        val textNodeInfo = findTextViewNode(source)
         if (textNodeInfo != null) {
             val rect = Rect()
             textNodeInfo.getBoundsInScreen(rect)
-            addAnimatedTextViewToWindow(this, rect, textNodeInfo.text.toString())
+            addAnimatedTextViewToWindow(this, rect, textNodeInfo.text?.toString().orEmpty())
             Log.i(TAG, "The TextView Node: ${textNodeInfo.text}")
         } else {
             val rect = Rect()
@@ -142,7 +143,8 @@ class MyAccessibilityService : AccessibilityService() {
         val layoutParams = WindowManager.LayoutParams().apply {
             // Set window type and flags for accessibility overlay
             type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-            flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             // Set layout parameters
             width = WindowManager.LayoutParams.WRAP_CONTENT
             height = WindowManager.LayoutParams.WRAP_CONTENT
@@ -165,9 +167,13 @@ class MyAccessibilityService : AccessibilityService() {
         // Apply the animation to the TextView
         windowManager.addView(view, layoutParams)
         //  animatedTextView.startAnimation(scaleAnimation)
-        animatedTextView.animate().scaleX(2f).scaleY(2f).setDuration(2000).withEndAction(Runnable {
-            windowManager.removeView(view)
-        })
+        animatedTextView.animate().scaleX(2f).scaleY(2f).setDuration(2000).withEndAction {
+            try {
+                windowManager.removeView(view)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
 
     }
 
@@ -177,7 +183,8 @@ class MyAccessibilityService : AccessibilityService() {
         val layoutParams = WindowManager.LayoutParams().apply {
             // Set window type and flags for accessibility overlay
             type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-            flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             // Set layout parameters
             width = 200
             height = 200
